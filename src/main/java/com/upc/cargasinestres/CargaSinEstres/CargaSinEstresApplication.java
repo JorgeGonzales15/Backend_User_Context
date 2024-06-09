@@ -22,7 +22,7 @@ public class CargaSinEstresApplication {
 			@Override
 			public void addCorsMappings(CorsRegistry registry) {
 				registry.addMapping("/**")
-						.allowedOrigins("https://cse-fundamentos.web.app")
+						.allowedOrigins("https://cse-fundamentos.web.app", "https://business-service-v4.azurewebsites.net", "http://localhost:4200")
 						.allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH") // Permitir los métodos necesarios
 						.allowedHeaders("*"); // Permitir todos los encabezados
 			}
