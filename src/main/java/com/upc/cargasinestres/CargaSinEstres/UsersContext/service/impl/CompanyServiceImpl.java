@@ -1,6 +1,8 @@
 package com.upc.cargasinestres.CargaSinEstres.UsersContext.service.impl;
 
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.upc.cargasinestres.CargaSinEstres.Shared.exception.ResourceNotFoundException;
 import com.upc.cargasinestres.CargaSinEstres.UsersContext.model.dto.Company.request.CompanyRequestDto;
 import com.upc.cargasinestres.CargaSinEstres.UsersContext.model.dto.Company.response.CompanyResponseDto;
@@ -10,8 +12,12 @@ import com.upc.cargasinestres.CargaSinEstres.UsersContext.service.ICompanyServic
 import com.upc.cargasinestres.CargaSinEstres.UsersContext.shared.validations.CompanyValidation;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of the ICompanyService interface.
@@ -22,12 +28,14 @@ public class CompanyServiceImpl implements ICompanyService {
 
     private final ICompanyRepository companyRepository;
     private final ModelMapper modelMapper;
+    private final RestTemplate restTemplate;
 
     //inyeccion de dependencias
-    public CompanyServiceImpl(ICompanyRepository companyRepository, ModelMapper modelMapper) {
+    public CompanyServiceImpl(ICompanyRepository companyRepository, ModelMapper modelMapper, RestTemplate restTemplate) {
 
         this.companyRepository = companyRepository;
         this.modelMapper = modelMapper;
+        this.restTemplate = restTemplate;
     }
 
     @Override
@@ -37,8 +45,8 @@ public class CompanyServiceImpl implements ICompanyService {
         return companies.stream()
                 .map(company -> {
                     CompanyResponseDto companyResponseDto = modelMapper.map(company, CompanyResponseDto.class);
-                    //int averageRating = calculateAverageRating(company);
-                    //companyResponseDto.setAverageRating(averageRating);
+                    int averageRating = calculateAverageRating(company.getId());
+                    companyResponseDto.setAverageRating(averageRating);
                     return companyResponseDto;
                 })
                 .toList();
@@ -50,10 +58,10 @@ public class CompanyServiceImpl implements ICompanyService {
         var company = companyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontro la empresa con id: " + id));
 
-        //int averageRating = calculateAverageRating(company);
+        int averageRating = calculateAverageRating(company.getId());
 
         CompanyResponseDto companyResponseDto = modelMapper.map(company, CompanyResponseDto.class);
-        //companyResponseDto.setAverageRating(averageRating);
+        companyResponseDto.setAverageRating(averageRating);
 
         return companyResponseDto;
     }
@@ -75,12 +83,16 @@ public class CompanyServiceImpl implements ICompanyService {
         if(companyRepository.findByLogo(companyRequestDto.getLogo()).isPresent())
             throw new RuntimeException("Ya existe una empresa con ese logo");
 
-        //CompanyValidation.ValidateCompany(companyRequestDto, servicioRepository);
+        CompanyValidation.ValidateCompany(companyRequestDto, getServiceIds());
 
-        //List<Servicio> servicios = servicioRepository.findAllById(companyRequestDto.getServicioIds());
+        List<Long> servicioIds = companyRequestDto.getServicioIds();
+
+        List<String> servicios = getNamesOfServicesByIdList(servicioIds);
+
         var newCompany = modelMapper.map(companyRequestDto, Company.class);
 
-        //newCompany.setServicios(servicios);
+        newCompany.setServicioIds(servicioIds);
+        newCompany.setServicios(servicios);
 
         var createdCompany = companyRepository.save(newCompany);
         return modelMapper.map(createdCompany, CompanyResponseDto.class);
@@ -125,15 +137,18 @@ public class CompanyServiceImpl implements ICompanyService {
             company.setPassword(companyRequestDto.getPassword());
         }
         if(companyRequestDto.getServicioIds()!=null) {
-            //CompanyValidation.validateCompanyServices(companyRequestDto.getServicioIds(), servicioRepository);
-            //List<Servicio> servicios = servicioRepository.findAllById(companyRequestDto.getServicioIds());
-            //company.setServicios(servicios);
+
+            CompanyValidation.ValidateCompany(companyRequestDto, getServiceIds());
+            List<Long> servicioIds = companyRequestDto.getServicioIds();
+            company.setServicioIds(servicioIds);
+
+            List<String> servicios = getNamesOfServicesByIdList(servicioIds);
+            company.setServicios(servicios);
         }
 
         Company updatedCompany = companyRepository.save(company); // se guardan los cambios en la base de datos
         return modelMapper.map(updatedCompany, CompanyResponseDto.class); // se retorna un responseDTO con los datos del company actualizado
     }
-
 
     @Override
     public CompanyResponseDto getCompanyForLogin(String email, String password) {
@@ -146,17 +161,67 @@ public class CompanyServiceImpl implements ICompanyService {
         return modelMapper.map(company, CompanyResponseDto.class); // se retorna un responseDTO con los datos del company
     }
 
-    /*public static int calculateAverageRating(Company company) {
-        if (company == null || company.getRatings() == null || company.getRatings().isEmpty()) {
-            return 0;  // Manejo de casos nulos o vacíos
+    public int calculateAverageRating(Long companyId) {
+        try {
+            String url = "https://business-service-v4.azurewebsites.net/api/v1/ratings/company/" + companyId;
+
+            List<Map<String, Object>> ratings = restTemplate.getForObject(url, List.class);
+
+            if (ratings != null && !ratings.isEmpty()) {
+                double sum = 0;
+                for (Map<String, Object> rating : ratings) {
+                    sum += (Integer) rating.get("stars");
+                }
+                return (int) (sum / ratings.size());
+            } else {
+                return 0;
+            }
+        } catch (Exception e){
+            return 0;
+        }
+    }
+
+    public List<Long> getServiceIds() {
+        String url = "https://business-service-v4.azurewebsites.net/api/v1/services";
+        List<Long> serviceIds = new ArrayList<>();
+
+        try {
+            String response = restTemplate.getForObject(url, String.class);
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            List<Map<String, Object>> services = objectMapper.readValue(response, new TypeReference<List<Map<String, Object>>>() {});
+
+            for (Map<String, Object> service : services) {
+                serviceIds.add(((Number) service.get("id")).longValue());
+            }
+        } catch (Exception e) {
+            return new ArrayList<>();
         }
 
-        List<Rating> ratings = company.getRatings();
-        double sumRatings = ratings.stream()
-                .mapToInt(Rating::getStars)
-                .sum();
+        return serviceIds;
+    }
 
-        return (int) Math.round(sumRatings / ratings.size());
-    }*/
+    public List<String> getNamesOfServicesByIdList(List<Long> serviceIds) {
+        String url = "https://business-service-v4.azurewebsites.net/api/v1/services/";
+        List<String> stringIds = serviceIds.stream()
+                .map(String::valueOf)
+                .collect(Collectors.toList());
+        String ids = String.join(",", stringIds);
+        url += ids;
 
+        List<String> names = new ArrayList<>();
+
+        try {
+            List<Map<String, Object>> services = restTemplate.getForObject(url, List.class);
+
+            for (Map<String, Object> service : services) {
+                String name = (String) service.get("name");
+                names.add(name);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return names;
+    }
 }

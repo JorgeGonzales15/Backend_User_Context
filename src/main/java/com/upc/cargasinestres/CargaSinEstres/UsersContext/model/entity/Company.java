@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -70,23 +72,17 @@ public class Company {
     @Column(name = "description", nullable = false)
     private String description;
 
-    /**
-     * The rating of the company
-     */
-    /*@OneToMany(mappedBy="company")
-    private List<Rating> ratings;*/
+    @ElementCollection
+    @Column(name = "servicioIds")
+    private List<Long> servicioIds;
+
+    @ElementCollection
+    @Column(name = "servicios")
+    private List<String> servicios;
 
     /**
      * Membership of the company
      */
     @Column(name="idMembership")
     private Long membershipId; //cambiar a conexion por id
-
-    /*@ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "company_servicio", // Nombre de la tabla de unión
-            joinColumns = @JoinColumn(name = "company_id"), // Columna que hace referencia a la entidad actual (Company)
-            inverseJoinColumns = @JoinColumn(name = "servicio_id") // Columna que hace referencia a la entidad relacionada (Servicio)
-    )
-    private List<Servicio> servicios;*/
 }

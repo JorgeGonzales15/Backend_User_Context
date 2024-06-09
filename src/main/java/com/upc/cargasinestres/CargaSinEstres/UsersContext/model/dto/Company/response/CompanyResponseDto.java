@@ -24,7 +24,6 @@ public class CompanyResponseDto {
     private String phoneNumber;
     private String description;
     private String logo;
-    private List<Long> servicios;
+    private List<String> servicios;
     private int averageRating;
-
 }

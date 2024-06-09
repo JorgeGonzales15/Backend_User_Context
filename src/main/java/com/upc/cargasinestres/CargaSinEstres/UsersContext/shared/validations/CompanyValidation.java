@@ -3,6 +3,9 @@ package com.upc.cargasinestres.CargaSinEstres.UsersContext.shared.validations;
 import com.upc.cargasinestres.CargaSinEstres.Shared.exception.ValidationException;
 import com.upc.cargasinestres.CargaSinEstres.UsersContext.model.dto.Company.request.CompanyRequestDto;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * The CompanyValidation class provides methods for validating CompanyRequestDto objects.
  * It checks for the length and presence of required fields in a company request.
@@ -65,30 +68,26 @@ public class CompanyValidation {
             throw new ValidationException("La dirección no puede exceder los 250 caracteres");
         }
     }
-    /*public static void validateCompanyServices(List<Long> servicioIds, IServicioRepository servicioRepository) {
+
+    public static void validateCompanyServices(List<Long> servicioIds, List<Long> availableServicioIds) {
         long distinctServiceCount = servicioIds.stream().distinct().count();
         if (distinctServiceCount != servicioIds.size()) {
             throw new ValidationException("La empresa no puede ofrecer servicios duplicados");
         }
 
-        // Obtener la lista de IDs de servicios proporcionados por la solicitud
-        List<Long> availableServicioIds = servicioRepository.findAll().stream()
-                .map(Servicio::getId)
-                .collect(Collectors.toList());
-
-        // Verificar si hay algún servicio proporcionado que no exista en la lista de servicios disponibles
         List<Long> invalidServicioIds = servicioIds.stream()
                 .filter(id -> !availableServicioIds.contains(id))
                 .collect(Collectors.toList());
 
-        // Si hay servicios no válidos, lanzar una excepción
         if (!invalidServicioIds.isEmpty()) {
-            throw new ValidationException("Este servicio no existe, solo puede acceder a los siguiente servicos: "+availableServicioIds);
+            System.out.println("invalidServicioIds: "+invalidServicioIds);
+
+            throw new ValidationException("Este servicio no existe, solo puede acceder a los siguiente servicos: " + availableServicioIds);
         }
-    }*/
 
+    }
 
-    public static void ValidateCompany(CompanyRequestDto companyRequestDto/*, IServicioRepository servicioRepository*/){
+    public static void ValidateCompany(CompanyRequestDto companyRequestDto, List<Long> availableServicioIds){
 
         if(companyRequestDto.getName().isEmpty()){
             throw new ValidationException("El nombre no puede estar vacio");
@@ -127,6 +126,6 @@ public class CompanyValidation {
         validateCompanyEmail(companyRequestDto.getEmail());
         validateCompanyDirection(companyRequestDto.getDirection());
         validateCompanyPassword(companyRequestDto.getPassword());
-        //validateCompanyServices(companyRequestDto.getServicioIds(), servicioRepository);
+        validateCompanyServices(companyRequestDto.getServicioIds(), availableServicioIds);
     }
 }
